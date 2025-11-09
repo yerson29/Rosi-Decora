@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { UploadIcon, CameraIcon, DocumentIcon, HeartIcon, MagicIcon, ViewIcon } from './icons/Icons';
+import ImageWithFallback from './ImageWithFallback'; // Import the new component
 
 interface ImageUploadProps {
   onImageUpload: (file: File) => void;
@@ -55,17 +56,11 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload }) => {
       setPreview(null);
       setFile(null);
   }
-
+  
   const handleSubmit = () => {
     if (file) {
       onImageUpload(file);
     }
-  };
-
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.error("Failed to load image preview:", e.currentTarget.src);
-    // Optionally, set a fallback image or hide the broken image
-    // e.currentTarget.src = "/path/to/placeholder.png"; 
   };
   
   return (
@@ -115,8 +110,14 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload }) => {
         </form>
       ) : (
         <div className="w-full max-w-2xl p-4 bg-white/50 backdrop-blur-sm rounded-3xl shadow-2xl">
-          <div className="relative">
-            <img src={preview} alt="Vista previa de la imagen subida" className="w-full h-auto object-cover rounded-2xl" onError={handleImageError} />
+          <div className="relative aspect-video"> {/* Added aspect-video for consistent sizing */}
+            {/* Replaced img with ImageWithFallback */}
+            <ImageWithFallback 
+                src={preview} 
+                alt="Vista previa de la imagen subida" 
+                className="w-full h-full object-cover rounded-2xl" 
+                fallbackIconClassName="w-1/3 h-1/3" 
+            />
             <button onClick={removePreview} className="absolute -top-3 -right-3 bg-white text-red-500 rounded-full p-2 shadow-lg hover:bg-red-500 hover:text-white transition-all" aria-label="Eliminar vista previa de la imagen">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>

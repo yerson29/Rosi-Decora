@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleVariation } from '../types';
+import ImageWithFallback from './ImageWithFallback'; // Import the new component
 
 interface RefinementPanelProps {
   styleVariation: StyleVariation;
@@ -21,23 +22,18 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({ styleVariation, onRef
       { imageUrl: styleVariation.imageUrl, prompt: "Diseño inicial" },
       ...styleVariation.iterations
   ];
-
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, type: string) => {
-    console.error(`Failed to load ${type} image:`, e.currentTarget.src);
-    // Optionally, set a fallback image or hide the broken image
-    // e.currentTarget.src = "/path/to/placeholder.png"; 
-  };
-
+  
   return (
     <div className="flex flex-col h-full">
       <h4 className="text-xl font-semibold mb-4 text-gray-700">Ajusta el Diseño</h4>
       
-      <div className="relative flex-grow bg-gray-100 rounded-2xl p-2 shadow-inner mb-4 overflow-hidden">
-        <img 
+      <div className="relative flex-grow bg-gray-100 rounded-2xl p-2 shadow-inner mb-4 overflow-hidden aspect-video"> {/* Added aspect-video */}
+        {/* Replaced img with ImageWithFallback */}
+        <ImageWithFallback 
             src={allImages[allImages.length - 1].imageUrl} 
             alt="Último diseño" 
             className="w-full h-full object-cover rounded-xl"
-            onError={(e) => handleImageError(e, "latest iteration")}
+            fallbackIconClassName="w-1/3 h-1/3" // Adjust as needed
         />
         <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
             Iteración #{styleVariation.iterations.length}
@@ -50,11 +46,12 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({ styleVariation, onRef
               <div className="flex items-center gap-2 overflow-x-auto pb-2" role="list" aria-label="Historial de iteraciones de diseño">
                    {allImages.slice(0, -1).map((iter, index) => (
                        <div key={index} className="flex-shrink-0 text-center" role="listitem">
-                           <img 
+                           {/* Replaced img with ImageWithFallback */}
+                           <ImageWithFallback 
                                src={iter.imageUrl} 
                                alt={`Iteración ${index}: ${iter.prompt}`} 
                                className="w-20 h-20 rounded-lg object-cover shadow-md mb-1"
-                               onError={(e) => handleImageError(e, `iteration ${index}`)}
+                               fallbackIconClassName="w-10 h-10" // Adjust as needed
                            />
                            <span className="text-xs text-gray-500">#{index}</span>
                        </div>
@@ -72,6 +69,9 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({ styleVariation, onRef
           rows={3}
           aria-label="Introduce tu solicitud de refinamiento de diseño"
         ></textarea>
+        <p className="text-sm text-gray-500 mb-4 text-center">
+            Consejo: Sé específico y conciso. Ej: "Añade una alfombra redonda gris", "Cambia el color de la pared a azul pastel", "Quita el cuadro grande".
+        </p>
         <button
           type="submit"
           disabled={!prompt.trim()}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Project } from '../types';
 import { DeleteIcon, ViewIcon } from './icons/Icons';
+import ImageWithFallback from './ImageWithFallback'; // Import the new component
 
 interface ArchiveViewProps {
   projects: Project[];
@@ -18,23 +19,18 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({ projects, onView, onDelete })
     );
   }
 
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.error("Failed to load archive project image:", e.currentTarget.src);
-    // Optionally, set a fallback image or hide the broken image
-    // e.currentTarget.src = "/path/to/placeholder.png"; 
-  };
-
   return (
     <div className="container mx-auto">
       <h2 className="text-4xl font-bold text-center mb-10 bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-500">Mis Proyectos</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8" role="list" aria-label="Lista de proyectos guardados">
         {projects.map(project => (
           <div key={project.id} className="bg-white rounded-3xl shadow-xl overflow-hidden group transition-all hover:shadow-2xl hover:-translate-y-1" role="listitem">
-            <img 
+            {/* Replaced img with ImageWithFallback */}
+            <ImageWithFallback 
                 src={project.originalImage} 
                 alt={`Imagen original del proyecto ${project.name}`} 
                 className="w-full h-48 object-cover" 
-                onError={handleImageError}
+                fallbackIconClassName="w-1/3 h-1/3"
             />
             <div className="p-5">
               <h3 className="font-bold text-xl truncate text-gray-800">{project.name}</h3>

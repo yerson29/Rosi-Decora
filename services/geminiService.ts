@@ -30,7 +30,7 @@ const generateStyleDetails = async (base64ImageData: string, mimeType: string, s
     
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts: [imagePart, {text: `Basado en esta imagen de una habitación rediseñada en estilo ${styleName}, proporciona una breve descripción, una paleta de 5 colores en códigos hexadecimales y 3 recomendaciones de muebles, incluyendo su nombre, una breve descripción, su precio en pesos chilenos (CLP), un enlace a un producto disponible y en stock en una tienda online de Chile, y una URL de imagen representativa del mueble o del producto en la tienda (si es posible encontrar una de la tienda o una genérica de buena calidad). Si no puedes encontrar una URL de imagen específica, puedes dejar el campo 'imageUrl' como una cadena vacía.`}] },
+        contents: { parts: [imagePart, {text: `Basado en esta imagen de una habitación rediseñada en estilo ${styleName}, proporciona una breve descripción, una paleta de 5 colores en códigos hexadecimales y 3 recomendaciones de muebles, incluyendo su nombre, una breve descripción, su precio en pesos chilenos (CLP), un enlace DIRECTO a un producto DISPONIBLE y EN STOCK en una tienda online de CHILE (ej. Falabella, Sodimac, Ripley, Paris). Si no encuentras un producto exacto, busca algo similar y relevante. TAMBIÉN, una URL de imagen de ALTA CALIDAD y FUNCIONAL que represente fielmente el mueble, idealmente desde la misma tienda online o una imagen genérica de producto. Si la imagen no se encuentra o la URL no es válida, usa una URL de una imagen genérica de placeholder de mueble o deja el campo vacío si es estrictamente necesario, pero prioriza una imagen válida.`}] },
         config: {
             responseMimeType: "application/json",
             responseSchema: {
@@ -50,8 +50,8 @@ const generateStyleDetails = async (base64ImageData: string, mimeType: string, s
                                 name: { type: Type.STRING },
                                 description: { type: Type.STRING },
                                 price: { type: Type.STRING, description: 'Precio en pesos chilenos con símbolo, ej. CLP$199.990' },
-                                link: { type: Type.STRING, description: 'Un enlace de ejemplo a un producto en una tienda chilena.' },
-                                imageUrl: { type: Type.STRING, description: 'URL de la imagen del mueble. Puede estar vacío si no se encuentra una.' } // New
+                                link: { type: Type.STRING, description: 'Un enlace DIRECTO a un producto DISPONIBLE y EN STOCK en una tienda online de CHILE (ej. Falabella, Sodimac, Ripley, Paris).' },
+                                imageUrl: { type: Type.STRING, description: 'URL de la imagen de ALTA CALIDAD del mueble. Prioriza una URL funcional y representativa del producto en una tienda chilena o una imagen genérica de producto.' } // New
                             },
                              required: ['name', 'description', 'price', 'link'] // imageUrl is optional for schema validation
                         }
@@ -99,7 +99,7 @@ const generateStyleDetails = async (base64ImageData: string, mimeType: string, s
 
 export const generateStyledImage = async (base64Data: string, mimeType: string, styleName: string): Promise<ImageBase64> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Rediseña esta habitación en un estilo ${styleName}. Mantén la estructura y disposición de la habitación pero cambia los muebles, colores y decoración para que coincida con el estilo ${styleName}. El resultado debe ser fotorrealista. No incluyas personas en la imagen.`;
+    const prompt = `Rediseña esta habitación en un estilo ${styleName}. Mantén la estructura y disposición de la habitación pero cambia los muebles, colores y decoración para que coincida con el estilo ${styleName}. El resultado debe ser fotorrealista, de alta calidad y claro. No incluyas personas en la imagen.`;
     
     const imagePart = fileToGenerativePart(base64Data, mimeType);
     const textPart = { text: prompt };

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppView } from '../types';
-import { HomeIcon, ArchiveIcon, SparklesIcon, UserIcon } from './icons/Icons'; // Removed LogoutIcon
+import { HomeIcon, ArchiveIcon, SparklesIcon, UserIcon, HeartIcon } from './icons/Icons'; // Added HeartIcon
 
 interface HeaderProps {
   onNavigate: (view: AppView) => void;
@@ -25,6 +25,10 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, onRosiClick }) => {
           <button onClick={() => onNavigate('archive')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-100 text-purple-700 hover:bg-purple-200 transition-all shadow-sm" aria-label="Ver proyectos guardados en el archivo">
             <ArchiveIcon className="w-5 h-5" />
             <span className="hidden sm:inline">Archivo</span>
+          </button>
+          <button onClick={() => onNavigate('favorites')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-100 text-purple-700 hover:bg-purple-200 transition-all shadow-sm" aria-label="Ver diseños favoritos">
+            <HeartIcon className="w-5 h-5" />
+            <span className="hidden sm:inline">Favoritos</span>
           </button>
           <button onClick={onRosiClick} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-100 text-purple-700 hover:bg-purple-200 transition-all shadow-sm" aria-label="Mostrar mensaje especial para Rosi">
             <UserIcon className="w-5 h-5" />

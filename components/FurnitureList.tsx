@@ -1,58 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Furniture } from '../types';
-import { ExternalLinkIcon, ImageIcon } from './icons/Icons';
+import { ExternalLinkIcon } from './icons/Icons';
+import ImageWithFallback from './ImageWithFallback'; // Import the new component
+
 
 interface FurnitureListProps {
   furniture: Furniture[];
 }
 
-// Helper component to handle furniture image loading and fallbacks
-const FurnitureImage: React.FC<{ src: string | undefined; alt: string }> = ({ src, alt }) => {
-    const [imgSrc, setImgSrc] = useState(src);
-    const [hasError, setHasError] = useState(false);
-
-    useEffect(() => {
-        setImgSrc(src);
-        setHasError(false);
-    }, [src]);
-
-    const handleError = () => {
-        setHasError(true);
-        console.error(`Error loading image for ${alt}: ${src}`);
-    };
-
-    if (hasError || !imgSrc) {
-        return (
-            <div className="w-full sm:w-24 h-24 flex-shrink-0 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500">
-                <ImageIcon className="w-12 h-12" />
-            </div>
-        );
-    }
-
-    return (
-        <img
-            src={imgSrc}
-            alt={alt}
-            className="w-full sm:w-24 h-24 object-cover rounded-lg flex-shrink-0"
-            onError={handleError}
-        />
-    );
-};
-
-
 const FurnitureList: React.FC<FurnitureListProps> = ({ furniture }) => {
   return (
     <div className="space-y-4">
-      {furniture.map((item, index) => (
+      {furniture
+        .filter(item => item.link) // Filter: only show items with a valid link
+        .map((item, index) => (
         <div key={index} className="bg-white p-4 rounded-2xl shadow-lg transition-all hover:shadow-xl hover:scale-102 flex flex-col sm:flex-row items-start gap-4">
-          <FurnitureImage src={item.imageUrl} alt={item.name} />
+          {/* Replaced FurnitureImage with ImageWithFallback */}
+          <ImageWithFallback src={item.imageUrl} alt={item.name} className="w-full sm:w-24 h-24 object-cover rounded-lg flex-shrink-0" fallbackIconClassName="w-1/2 h-1/2" />
           <div className="flex-grow">
             <div className="flex justify-between items-start">
               <h5 className="font-bold text-lg text-gray-800">{item.name}</h5>
               <span className="text-lg font-semibold text-pink-500">{item.price}</span>
             </div>
             <p className="text-sm text-gray-500 mt-1 mb-3">{item.description}</p>
-            {item.link && ( // Only show link if it exists
+            {/* The link is guaranteed to exist due to the filter above, but keeping the check for safety */}
+            {item.link && ( 
               <a
                 href={item.link}
                 target="_blank"

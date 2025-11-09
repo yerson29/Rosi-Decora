@@ -37,4 +37,12 @@ export interface Project {
   createdAt: string;
 }
 
-export type AppView = 'upload' | 'project' | 'archive';
+export interface FavoriteDesign {
+  id: string;
+  projectId: string;
+  projectName: string;
+  favoritedAt: string;
+  styleVariation: StyleVariation;
+}
+
+export type AppView = 'upload' | 'project' | 'archive' | 'favorites';

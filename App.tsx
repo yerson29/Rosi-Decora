@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { Project, StyleVariation, AppView, ImageBase64, Iteration } from './types';
+import { Project, StyleVariation, AppView, ImageBase64, Iteration, FavoriteDesign } from './types';
 import Header from './components/Header';
 import ImageUpload from './components/ImageUpload';
 import ProjectView from './components/ProjectView';
 import ArchiveView from './components/ArchiveView';
+import FavoritesView from './components/FavoritesView'; // Import the new component
 import { analyzeImage, generateInitialDesigns, refineDesign } from './services/geminiService';
+import ImageWithFallback from './components/ImageWithFallback'; // Import the new component
 
 // Base64 image for the kiss (simple SVG lips)
-const KISS_IMAGE_BASE64 = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNjAiPgogIDxwYXRoIGZpbGw9IiNFOTFFNjMiIGQ9Ik0gMTAgMzAgUSAzMCAxMCwgNTAgMzAgVCA5MCAzMCBDIDgwIDQ0LCA2MCA1NSwgNTAgNTUgQyA0MCA1NSwgMjAgNDQsIDEwIDMwIFoiLz4KPC9zdmc+";
+const KISS_IMAGE_BASE64 = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNjAiPgogIDxwYXRoIGZpbGw9IiNFOTFFNjMiIGQ9Ik0gMTAgMzAgUSAzMCAtMTAsIDUwIDMwIFQgOTAgMzAgQyA4MCA0NCwgNjAgNTUsIDUwIDU1IEMgNDAgNTUsIDIwIDQ0LCAxMCAzMCBaIi8+CiAgPC9zdmc+";
+
 
 // Helper to convert data URL to ImageBase64 object
 const dataUrlToImageBase64 = (dataUrl: string): ImageBase64 | null => {
@@ -50,6 +53,7 @@ const isValidDataUrl = (url: string | null | undefined): boolean => {
 
 const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteDesign[]>([]); // New state for favorites
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [activeView, setActiveView] = useState<AppView>('upload');
   const [isLoading, setIsLoading] = useState(false);
@@ -63,34 +67,22 @@ const App: React.FC = () => {
       if (savedProjects) {
         const loadedProjects: Project[] = JSON.parse(savedProjects);
 
-        // Hydrate imageBase64 objects for runtime use if nullified in storage
         const hydratedProjects = loadedProjects.map(project => {
           const hydratedProject: Project = { ...project };
-          if (!hydratedProject.originalImageBase64 && isValidDataUrl(hydratedProject.originalImage)) {
-            hydratedProject.originalImageBase64 = dataUrlToImageBase64(hydratedProject.originalImage);
-          } else if (!isValidDataUrl(hydratedProject.originalImage)) {
-            console.warn(`Project ${project.id}: originalImage is not a valid data URL.`, hydratedProject.originalImage);
-          }
+          // For originalImage, it's explicitly set to '' when saving, so it won't be a valid data URL on load.
+          // ImageBase64 will be null, and ImageWithFallback will show the placeholder.
+          hydratedProject.originalImageBase64 = null; 
 
           hydratedProject.styleVariations = project.styleVariations.map(variation => {
             const hydratedVariation: StyleVariation = { ...variation };
-            // IMPORTANT: imageUrl and imageBase64 for ROOM images are intentionally NOT persisted
-            // due to localStorage size limits. They will be null/empty on reload.
-            if (!hydratedVariation.imageBase64 && isValidDataUrl(hydratedVariation.imageUrl)) {
-              hydratedVariation.imageBase64 = dataUrlToImageBase64(hydratedVariation.imageUrl);
-            } else if (!isValidDataUrl(hydratedVariation.imageUrl)) {
-              // FIX: Corrected typo from `hydatedVariation` to `hydratedVariation`
-              console.warn(`Project ${project.id}, Style ${variation.style_name}: imageUrl is not a valid data URL or was intentionally cleared for persistence.`, hydratedVariation.imageUrl);
-            }
+            // For imageUrl, it's explicitly set to '' when saving, so it won't be a valid data URL on load.
+            // ImageBase64 will be null, and ImageWithFallback will show the placeholder.
+            hydratedVariation.imageBase64 = null; 
             hydratedVariation.iterations = variation.iterations.map(iteration => {
               const hydratedIteration: Iteration = { ...iteration };
-              // IMPORTANT: imageUrl and imageBase64 for ROOM images are intentionally NOT persisted
-              // due to localStorage size limits. They will be null/empty on reload.
-              if (!hydratedIteration.imageBase64 && isValidDataUrl(hydratedIteration.imageUrl)) {
-                hydratedIteration.imageBase64 = dataUrlToImageBase64(hydratedIteration.imageUrl);
-              } else if (!isValidDataUrl(hydratedIteration.imageUrl)) {
-                console.warn(`Project ${project.id}, Style ${variation.style_name}, Iteration '${iteration.prompt}': imageUrl is not a valid data URL or was intentionally cleared for persistence.`, hydratedIteration.imageUrl);
-              }
+              // For imageUrl, it's explicitly set to '' when saving, so it won't be a valid data URL on load.
+              // ImageBase64 will be null, and ImageWithFallback will show the placeholder.
+              hydratedIteration.imageBase64 = null; 
               return hydratedIteration;
             });
             return hydratedVariation;
@@ -100,35 +92,51 @@ const App: React.FC = () => {
         
         setProjects(hydratedProjects);
       }
+
+      const savedFavorites = localStorage.getItem('rosi-decora-favorites'); // Load favorites
+      if (savedFavorites) {
+        const loadedFavorites: FavoriteDesign[] = JSON.parse(savedFavorites);
+        const hydratedFavorites = loadedFavorites.map(favorite => {
+          const hydratedFavorite: FavoriteDesign = { ...favorite };
+          const hydratedStyleVariation: StyleVariation = { ...favorite.styleVariation };
+          hydratedStyleVariation.imageBase64 = null;
+          hydratedStyleVariation.iterations = favorite.styleVariation.iterations.map(iteration => ({
+            ...iteration,
+            imageBase64: null,
+          }));
+          hydratedFavorite.styleVariation = hydratedStyleVariation;
+          return hydratedFavorite;
+        });
+        setFavorites(hydratedFavorites);
+      }
+
     } catch (error) {
-      console.error("Failed to load or parse projects from localStorage", error);
+      console.error("Failed to load or parse projects/favorites from localStorage", error);
     }
   }, []);
 
   const saveProjects = (updatedProjects: Project[]) => {
     try {
-      // Create a savable version of projects by nullifying large base64 data URLs/objects
+      // Create a savable version of projects, explicitly clearing large image data from string fields
+      // to prevent QuotaExceededError. Images will not persist on page reload.
       const savableProjects = updatedProjects.map(project => {
         const clonedProject: Project = { ...project };
-        clonedProject.originalImageBase64 = null; // Remove large data object
-        clonedProject.originalImage = ''; // IMPORTANT: Remove large data URL string for persistence (room image)
-
+        clonedProject.originalImage = ''; // Clear original image data for saving space
+        clonedProject.originalImageBase64 = null; // Also clear the object
         clonedProject.styleVariations = project.styleVariations.map(variation => {
           const clonedVariation: StyleVariation = { ...variation };
-          clonedVariation.imageBase64 = null; // Remove large data object
-          clonedVariation.imageUrl = ''; // IMPORTANT: Remove large data URL string for persistence (room image)
+          clonedVariation.imageUrl = ''; // Clear variation image data for saving space
+          clonedVariation.imageBase64 = null; // Also clear the object
 
           clonedVariation.iterations = variation.iterations.map(iteration => {
             const clonedIteration: Iteration = { ...iteration };
-            clonedIteration.imageBase64 = null; // Remove large data object
-            clonedIteration.imageUrl = ''; // IMPORTANT: Remove large data URL string for persistence (room image)
+            clonedIteration.imageUrl = ''; // Clear iteration image data for saving space
+            clonedIteration.imageBase64 = null; // Also clear the object
             return clonedIteration;
           });
           
-          // Furniture recommendations' imageUrls are external URLs and are NOT cleared.
-          // They should persist as they are small strings.
           clonedVariation.furniture_recommendations = variation.furniture_recommendations.map(furniture => ({
-            ...furniture // Keep all furniture properties, including imageUrl if present
+            ...furniture 
           }));
         
           return clonedVariation;
@@ -140,6 +148,36 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Failed to save projects to localStorage", error);
       alert("No se pudieron guardar los proyectos. El almacenamiento local está lleno. Por favor, elimina algunos proyectos antiguos.");
+    }
+  };
+
+  const saveFavorites = (updatedFavorites: FavoriteDesign[]) => { // New function to save favorites
+    try {
+      // Create a savable version of favorites, explicitly clearing large image data from string fields
+      // to prevent QuotaExceededError. Images will not persist on page reload.
+      const savableFavorites = updatedFavorites.map(favorite => {
+        const clonedFavorite: FavoriteDesign = { ...favorite };
+        const clonedStyleVariation: StyleVariation = { ...favorite.styleVariation };
+        
+        clonedStyleVariation.imageUrl = ''; // Clear image data for saving space
+        clonedStyleVariation.imageBase64 = null;
+
+        clonedStyleVariation.iterations = favorite.styleVariation.iterations.map(iteration => {
+          const clonedIteration: Iteration = { ...iteration };
+          clonedIteration.imageUrl = ''; // Clear image data for saving space
+          clonedIteration.imageBase64 = null;
+          return clonedIteration;
+        });
+
+        clonedFavorite.styleVariation = clonedStyleVariation;
+        return clonedFavorite;
+      });
+
+      setFavorites(updatedFavorites);
+      localStorage.setItem('rosi-decora-favorites', JSON.stringify(savableFavorites));
+    } catch (error) {
+      console.error("Failed to save favorites to localStorage", error);
+      alert("No se pudieron guardar los favoritos. El almacenamiento local está lleno. Por favor, elimina algunos favoritos o proyectos antiguos.");
     }
   };
   
@@ -160,7 +198,7 @@ const App: React.FC = () => {
         const newProject: Project = {
           id: Date.now().toString(),
           name: `Proyecto ${projects.length + 1}`,
-          originalImage: fullDataUrl, // Store full data URL for persistence (will be nulled on save to localStorage)
+          originalImage: fullDataUrl, // Store full data URL for persistence (during active session)
           originalImageBase64: { data: base64Data, mimeType }, // Keep for current session's immediate use
           analysis,
           styleVariations: [],
@@ -172,8 +210,6 @@ const App: React.FC = () => {
 
         newProject.styleVariations = variations.map(v => ({
             ...v,
-            // v.imageBase64 is correctly set by generateInitialDesigns
-            // v.imageUrl is correctly set by generateInitialDesigns
             iterations: [] // Start with empty iterations, as generateInitialDesigns returns this
         }));
         
@@ -215,8 +251,7 @@ const App: React.FC = () => {
           baseImageForRefinement = styleToRefine.imageBase64;
       } else {
         // Fallback: Reconstruct ImageBase64 from the data URL if the raw object is null (archived project)
-        // Note: As per localStorage strategy, imageUrl will be empty for archived projects.
-        // This means images for archived projects cannot be refined unless re-uploaded.
+        // Note: For saved projects, imageUrl will be '', so this path won't yield a valid image
         if (styleToRefine.iterations.length > 0) {
             baseImageForRefinement = dataUrlToImageBase64(styleToRefine.iterations[styleToRefine.iterations.length - 1].imageUrl);
         } else {
@@ -226,7 +261,7 @@ const App: React.FC = () => {
           
       if (!baseImageForRefinement || !baseImageForRefinement.data || !baseImageForRefinement.mimeType) {
         console.error("No base image found or could not be reconstructed for refinement.");
-        alert("No se encontró una imagen base para refinar el diseño. Por favor, intenta con otro proyecto (Las imágenes de proyectos guardados no persisten).");
+        alert("No se encontró una imagen base para refinar el diseño. Por favor, intenta con otro proyecto."); 
         setIsLoading(false);
         return;
       }
@@ -265,9 +300,30 @@ const App: React.FC = () => {
       }
   };
 
+  const handleFavoriteDesign = (designToFavorite: StyleVariation, projectId: string, projectName: string) => {
+    const newFavorite: FavoriteDesign = {
+      id: Date.now().toString(),
+      projectId: projectId,
+      projectName: projectName,
+      favoritedAt: new Date().toISOString(),
+      styleVariation: { // Clone to ensure we don't modify the original state object reference unexpectedly
+        ...designToFavorite,
+        iterations: designToFavorite.iterations.map(iter => ({...iter}))
+      }, 
+    };
+    const updatedFavorites = [...favorites, newFavorite];
+    setFavorites(updatedFavorites);
+    saveFavorites(updatedFavorites);
+    alert("¡Diseño guardado en Favoritos!");
+  };
+
   const deleteProject = (projectId: string) => {
     const updatedProjects = projects.filter(p => p.id !== projectId);
     saveProjects(updatedProjects);
+    // Also remove any favorites associated with this project
+    const updatedFavorites = favorites.filter(fav => fav.projectId !== projectId);
+    saveFavorites(updatedFavorites);
+
     if (currentProject?.id === projectId) {
       setCurrentProject(null);
       setActiveView('upload');
@@ -275,13 +331,26 @@ const App: React.FC = () => {
     if (activeView === 'archive' && updatedProjects.length === 0) {
       setActiveView('upload');
     }
+    if (activeView === 'favorites' && updatedFavorites.length === 0) {
+      setActiveView('upload');
+    }
   };
 
-  const viewProject = (projectId: string) => {
+  const deleteFavorite = (favoriteId: string) => {
+    const updatedFavorites = favorites.filter(fav => fav.id !== favoriteId);
+    saveFavorites(updatedFavorites);
+    if (activeView === 'favorites' && updatedFavorites.length === 0) {
+      setActiveView('upload');
+    }
+  };
+
+  const viewProject = (projectId: string, initialStyleName?: string) => {
     const projectToView = projects.find(p => p.id === projectId);
     if (projectToView) {
       setCurrentProject(projectToView);
       setActiveView('project');
+      // Logic to select specific style if needed (e.g., from favorites)
+      // This will be handled inside ProjectView, passing a prop or using state there.
     }
   };
   
@@ -294,12 +363,6 @@ const App: React.FC = () => {
 
   const handleRosiClick = () => {
     setShowRosiMessage(true);
-  };
-
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.error("Failed to load image:", e.currentTarget.src);
-    // Optionally, set a fallback image or hide the broken image
-    // e.currentTarget.src = "/path/to/placeholder.png"; 
   };
 
 
@@ -329,7 +392,13 @@ const App: React.FC = () => {
                     <p className="text-gray-700 text-lg mb-8">
                         Siempre llenas de magia y amor cada espacio. ¡Gracias por tanto cariño!
                     </p>
-                    <img src={KISS_IMAGE_BASE64} alt="Un beso para Rosi" className="mx-auto w-24 h-auto mb-8 animate-pulse-once" onError={handleImageError}/>
+                    {/* Replaced img with ImageWithFallback */}
+                    <ImageWithFallback 
+                        src={KISS_IMAGE_BASE64} 
+                        alt="Un beso para Rosi" 
+                        className="mx-auto w-24 h-auto mb-8 animate-pulse-once" 
+                        fallbackIconClassName="w-12 h-12 text-pink-400" 
+                    />
                     <button 
                         onClick={() => setShowRosiMessage(false)} 
                         className="px-8 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white font-semibold shadow-lg hover:scale-105 transition-transform"
@@ -342,8 +411,9 @@ const App: React.FC = () => {
         )}
 
         {activeView === 'upload' && <ImageUpload onImageUpload={handleImageUpload} />}
-        {activeView === 'project' && currentProject && <ProjectView project={currentProject} onRefine={handleRefineRequest} />}
+        {activeView === 'project' && currentProject && <ProjectView project={currentProject} onRefine={handleRefineRequest} onFavorite={handleFavoriteDesign} />}
         {activeView === 'archive' && <ArchiveView projects={projects} onView={viewProject} onDelete={deleteProject} />}
+        {activeView === 'favorites' && <FavoritesView favorites={favorites} onView={viewProject} onDelete={deleteFavorite} />}
       </main>
     </div>
   );

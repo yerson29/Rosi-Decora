@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { Project, StyleVariation } from '../types';
 import RefinementPanel from './RefinementPanel';
 import FurnitureList from './FurnitureList';
+import ImageWithFallback from './ImageWithFallback'; // Import the new component
+import { HeartIcon } from './icons/Icons'; // Import HeartIcon
 
 interface ProjectViewProps {
   project: Project;
   onRefine: (project: Project, styleName: string, prompt: string) => void;
+  onFavorite: (designToFavorite: StyleVariation, projectId: string, projectName: string) => void; // New prop
 }
 
 const StyleCard: React.FC<{ variation: StyleVariation; onSelect: () => void; isSelected: boolean }> = ({ variation, onSelect, isSelected }) => (
@@ -15,15 +18,12 @@ const StyleCard: React.FC<{ variation: StyleVariation; onSelect: () => void; isS
         aria-label={`Seleccionar estilo ${variation.style_name}`}
         role="button"
     >
-        <img 
+        {/* Replaced img with ImageWithFallback */}
+        <ImageWithFallback 
             src={variation.imageUrl} 
             alt={variation.style_name} 
             className="w-full h-64 object-cover" 
-            onError={(e) => {
-                console.error("Failed to load style variation image:", e.currentTarget.src);
-                // Optionally, set a fallback image
-                // e.currentTarget.src = "/path/to/placeholder.png";
-            }}
+            fallbackIconClassName="w-1/2 h-1/2" // Adjust as needed
         />
         <div className="p-6">
             <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-500">{variation.style_name}</h3>
@@ -32,7 +32,7 @@ const StyleCard: React.FC<{ variation: StyleVariation; onSelect: () => void; isS
 );
 
 
-const ProjectView: React.FC<ProjectViewProps> = ({ project, onRefine }) => {
+const ProjectView: React.FC<ProjectViewProps> = ({ project, onRefine, onFavorite }) => {
     const [selectedStyle, setSelectedStyle] = useState<StyleVariation | null>(project.styleVariations[0] || null);
     
     return (
@@ -54,6 +54,15 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, onRefine }) => {
             {selectedStyle && (
                 <div className="bg-white/50 backdrop-blur-md rounded-3xl shadow-2xl p-6 md:p-10">
                     <h3 className="text-4xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-500">{selectedStyle.style_name}</h3>
+                    
+                    <button 
+                      onClick={() => onFavorite(selectedStyle, project.id, project.name)} 
+                      className="mb-8 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-pink-400 to-fuchsia-400 text-white font-semibold shadow-lg hover:scale-105 transition-transform"
+                      aria-label="Guardar este diseño en favoritos"
+                    >
+                      <HeartIcon className="w-5 h-5"/> Guardar como Favorito
+                    </button>
+
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                         <div>
                             <RefinementPanel 
