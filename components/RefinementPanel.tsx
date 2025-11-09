@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { StyleVariation } from '../types';
 import ImageWithFallback from './ImageWithFallback'; // Import the new component
+import { RevertIcon } from './icons/Icons';
 
 interface RefinementPanelProps {
   styleVariation: StyleVariation;
   onRefine: (prompt: string) => void;
+  onRevert: () => void;
 }
 
-const RefinementPanel: React.FC<RefinementPanelProps> = ({ styleVariation, onRefine }) => {
+const RefinementPanel: React.FC<RefinementPanelProps> = ({ styleVariation, onRefine, onRevert }) => {
   const [prompt, setPrompt] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -70,16 +72,28 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({ styleVariation, onRef
           aria-label="Introduce tu solicitud de refinamiento de diseño"
         ></textarea>
         <p className="text-sm text-gray-500 mb-4 text-center">
-            Consejo: Sé específico y conciso. Ej: "Añade una alfombra redonda gris", "Cambia el color de la pared a azul pastel", "Quita el cuadro grande".
+            Un consejo, mi amor: Sé específica y concisa. Ej: "Añade una alfombra redonda gris", "Cambia el color de la pared a azul pastel", "Quita el cuadro grande".
         </p>
-        <button
-          type="submit"
-          disabled={!prompt.trim()}
-          className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white font-semibold shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
-          aria-label="Generar una nueva versión del diseño"
-        >
-          Generar Nueva Versión
-        </button>
+        <div className="flex items-center gap-4">
+            <button
+              type="submit"
+              disabled={!prompt.trim()}
+              className="flex-grow py-3 rounded-xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white font-semibold shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+              aria-label="Generar una nueva versión del diseño"
+            >
+              Crear Nueva Versión
+            </button>
+            <button
+                type="button"
+                onClick={onRevert}
+                disabled={styleVariation.iterations.length === 0}
+                className="flex-shrink-0 p-3 rounded-xl bg-gray-200 text-gray-700 font-semibold shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+                aria-label="Volver a la versión anterior"
+                title="Volver a la versión anterior"
+            >
+                <RevertIcon className="w-6 h-6"/>
+            </button>
+        </div>
       </form>
     </div>
   );

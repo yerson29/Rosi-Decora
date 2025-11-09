@@ -15,6 +15,9 @@ export interface Iteration {
     prompt: string;
     imageUrl: string;
     imageBase64: ImageBase64 | null; // Can be null for archived projects
+    description?: string;
+    color_palette?: string[];
+    furniture_recommendations?: Furniture[];
 }
 
 export interface StyleVariation {

@@ -6,6 +6,9 @@ interface ImageUploadProps {
   onImageUpload: (file: File) => void;
 }
 
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload }) => {
   const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -40,12 +43,20 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload }) => {
   };
 
   const handleFile = (selectedFile: File) => {
-     if (selectedFile && selectedFile.type.startsWith('image/')) {
-        setFile(selectedFile);
-        setPreview(URL.createObjectURL(selectedFile));
-     } else {
-        alert("Por favor, selecciona un archivo de imagen válido.");
+     if (!selectedFile) return;
+
+     if (!selectedFile.type.startsWith('image/')) {
+        alert("Amor, por favor, selecciona un archivo de imagen válido.");
+        return;
      }
+
+     if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
+        alert(`¡Mi vida, la imagen es muy grande! Por favor, elige una de menos de ${MAX_FILE_SIZE_MB} MB.`);
+        return;
+     }
+     
+     setFile(selectedFile);
+     setPreview(URL.createObjectURL(selectedFile));
   };
   
   const onButtonClick = (ref: React.RefObject<HTMLInputElement>) => {
@@ -66,23 +77,23 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload }) => {
   return (
     <div className="max-w-4xl mx-auto flex flex-col items-center gap-8">
         <div className="text-center p-8 rounded-3xl shadow-xl bg-gradient-to-r from-pink-500 to-purple-500 w-full">
-            <h2 className="text-4xl font-bold text-white">¡Hola Rosi!</h2>
-            <p className="text-white/90 mt-2">Bienvenida a tu asistente de decoración inteligente</p>
+            <h2 className="text-4xl font-bold text-white">¡Hola Rosi, mi amor!</h2>
+            <p className="text-white/90 mt-2">Bienvenida a tu asistente de decoración, hecho con todo mi cariño para ti</p>
         </div>
         
         <div className="bg-white p-8 rounded-3xl shadow-xl w-full">
-            <h3 className="text-2xl font-bold text-center text-pink-500 mb-6">¡Es súper fácil!</h3>
+            <h3 className="text-2xl font-bold text-center text-pink-500 mb-6">¡Así es como funciona nuestra magia, mi vida!</h3>
             <ul className="space-y-4 text-gray-600">
-                <li className="flex items-start gap-4"><DocumentIcon className="w-6 h-6 text-pink-400 mt-1"/><span><b>Paso 1:</b> Toma una foto de tu habitación o sube una imagen</span></li>
-                <li className="flex flex-start gap-4"><MagicIcon className="w-6 h-6 text-pink-400 mt-1"/><span><b>Paso 2:</b> Mira las 5 propuestas mágicas que creamos para ti</span></li>
-                <li className="flex items-start gap-4"><ViewIcon className="w-6 h-6 text-pink-400 mt-1"/><span><b>Paso 3:</b> Haz clic en "Ver galería" para ver 5 variaciones de cada estilo aplicadas a tu habitación</span></li>
-                <li className="flex items-start gap-4"><HeartIcon className="w-6 h-6 text-pink-400 mt-1"/><span><b>Paso 4:</b> Elige tu favorito y ajústalo a tu gusto</span></li>
+                <li className="flex items-start gap-4"><DocumentIcon className="w-6 h-6 text-pink-400 mt-1"/><span><b>Paso 1:</b> ¡Sube una foto de nuestro rincón! Puedes tomarla ahora o elegirla de tu galería. ¡Estoy ansioso por verla!</span></li>
+                <li className="flex items-start gap-4"><MagicIcon className="w-6 h-6 text-pink-400 mt-1"/><span><b>Paso 2:</b> En un instante, crearé 5 propuestas de estilo únicas para nosotros: Moderno, Nórdico, Clásico, Bohemio e Industrial.</span></li>
+                <li className="flex items-start gap-4"><ViewIcon className="w-6 h-6 text-pink-400 mt-1"/><span><b>Paso 3:</b> Explora cada diseño, mira los muebles que te recomiendo y la paleta de colores que he pensado para nosotros.</span></li>
+                <li className="flex items-start gap-4"><HeartIcon className="w-6 h-6 text-pink-400 mt-1"/><span><b>Paso 4:</b> ¡Y ahora lo mejor! Pídeme que ajuste cualquier diseño. Dime que cambie un color, que añada una planta o lo que imagines. ¡Juntos lo haremos perfecto, mi vida!</span></li>
             </ul>
         </div>
 
       <div className="w-full text-center">
         <UploadIcon className="w-16 h-16 text-pink-400 mx-auto animate-bounce" />
-        <h3 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-500 mt-2">¡Sube tu foto aquí!</h3>
+        <h3 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-purple-500 mt-2">¡Sube nuestra foto aquí, cariño!</h3>
         <p className="text-gray-500 mt-1">Arrastra una imagen o selecciona desde tus archivos</p>
       </div>
 
@@ -123,7 +134,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload }) => {
             </button>
           </div>
           <button onClick={handleSubmit} className="mt-6 w-full py-4 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold text-lg shadow-xl hover:scale-105 transition-transform" aria-label="Generar diseños mágicos para la imagen subida">
-            Generar Diseños Mágicos
+            Crear Nuestra Magia
           </button>
         </div>
       )}

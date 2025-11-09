@@ -5,6 +5,8 @@ if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable not set");
 }
 
+const MAX_IMAGE_GENERATION_RETRIES = 3;
+
 export const fileToGenerativePart = (data: string, mimeType: string) => {
   return {
     inlineData: {
@@ -21,6 +23,9 @@ export const analyzeImage = async (base64Data: string, mimeType: string): Promis
         model: 'gemini-2.5-flash',
         contents: { parts: [imagePart, { text: "Analiza esta imagen de una habitación. Describe el tipo de habitación (ej. sala de estar, dormitorio) y su estilo actual. Sé conciso y directo." }] },
     });
+    if (response.promptFeedback?.blockReason) {
+        throw new Error(`El análisis de la imagen fue bloqueado por: ${response.promptFeedback.blockReason}.`);
+    }
     return response.text;
 };
 
@@ -30,7 +35,7 @@ const generateStyleDetails = async (base64ImageData: string, mimeType: string, s
     
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts: [imagePart, {text: `Basado en esta imagen de una habitación rediseñada en estilo ${styleName}, proporciona una breve descripción, una paleta de 5 colores en códigos hexadecimales y 3 recomendaciones de muebles, incluyendo su nombre, una breve descripción, su precio en pesos chilenos (CLP), un enlace DIRECTO a un producto DISPONIBLE y EN STOCK en una tienda online de CHILE (ej. Falabella, Sodimac, Ripley, Paris). Si no encuentras un producto exacto, busca algo similar y relevante. TAMBIÉN, una URL de imagen de ALTA CALIDAD y FUNCIONAL que represente fielmente el mueble, idealmente desde la misma tienda online o una imagen genérica de producto. Si la imagen no se encuentra o la URL no es válida, usa una URL de una imagen genérica de placeholder de mueble o deja el campo vacío si es estrictamente necesario, pero prioriza una imagen válida.`}] },
+        contents: { parts: [imagePart, {text: `Basado en esta imagen de una habitación rediseñada en estilo ${styleName}, proporciona una breve descripción, una paleta de 5 colores en códigos hexadecimales y 3 recomendaciones de muebles. Para cada mueble, incluye: nombre, una breve descripción, su precio en pesos chilenos (CLP), un enlace DIRECTO y VÁLIDO a un producto que esté ACTUALMENTE DISPONIBLE y EN STOCK en una tienda online de CHILE (ej. Falabella, Sodimac, Ripley, Paris). ES OBLIGATORIO QUE VERIFIQUES LA DISPONIBILIDAD. Además, proporciona una URL de imagen PÚBLICA y FUNCIONAL que apunte directamente al archivo de imagen del producto (que termine en .jpg, .png, .webp). LA URL DE LA IMAGEN DEBE SER DIRECTA AL ARCHIVO, NO A UNA PÁGINA WEB. Prioriza imágenes de la misma tienda online. Si no encuentras una URL de imagen de producto válida, busca una imagen genérica de alta calidad de un producto muy similar que sea funcional.`}] },
         config: {
             responseMimeType: "application/json",
             responseSchema: {
@@ -51,9 +56,9 @@ const generateStyleDetails = async (base64ImageData: string, mimeType: string, s
                                 description: { type: Type.STRING },
                                 price: { type: Type.STRING, description: 'Precio en pesos chilenos con símbolo, ej. CLP$199.990' },
                                 link: { type: Type.STRING, description: 'Un enlace DIRECTO a un producto DISPONIBLE y EN STOCK en una tienda online de CHILE (ej. Falabella, Sodimac, Ripley, Paris).' },
-                                imageUrl: { type: Type.STRING, description: 'URL de la imagen de ALTA CALIDAD del mueble. Prioriza una URL funcional y representativa del producto en una tienda chilena o una imagen genérica de producto.' } // New
+                                imageUrl: { type: Type.STRING, description: 'URL de la imagen PÚBLICA y FUNCIONAL del mueble (ej. terminada en .jpg o .png). Prioriza una URL funcional y representativa del producto.' }
                             },
-                             required: ['name', 'description', 'price', 'link'] // imageUrl is optional for schema validation
+                             required: ['name', 'description', 'price', 'link', 'imageUrl']
                         }
                     }
                 },
@@ -62,31 +67,28 @@ const generateStyleDetails = async (base64ImageData: string, mimeType: string, s
         }
     });
 
-    // Check for prompt blocking for text generation
     if (response.promptFeedback?.blockReason) {
-        console.error("API blocked prompt for style details generation:", response.promptFeedback.blockReason, response.promptFeedback.safetyRatings, "Full response:", JSON.stringify(response, null, 2));
-        throw new Error(`La generación de detalles de estilo falló debido a que el mensaje fue bloqueado por: ${response.promptFeedback.blockReason}. Por favor, intenta un mensaje diferente.`);
+        console.error("API blocked prompt for style details generation:", response.promptFeedback.blockReason, response.promptFeedback.safetyRatings);
+        throw new Error(`La generación de detalles fue bloqueada por: ${response.promptFeedback.blockReason}. Por favor, ajusta el mensaje.`);
     }
 
     const jsonText = response.text.trim();
-    
     if (!jsonText) {
-        console.error("API response for style details was empty or invalid JSON. Full response:", JSON.stringify(response, null, 2));
-        throw new Error("La generación de detalles de estilo falló: La respuesta de la API estaba vacía o no era JSON válido.");
+        console.error("API response for style details was empty.");
+        throw new Error("La generación de detalles falló: La respuesta de la API estaba vacía.");
     }
 
     let parsed;
     try {
         parsed = JSON.parse(jsonText);
     } catch (e: any) {
-        console.error("Failed to parse JSON response for style details:", e, "Raw response text:", jsonText, "Full response:", JSON.stringify(response, null, 2));
-        throw new Error(`La generación de detalles de estilo falló: La respuesta de la API no es un JSON válido. Error: ${e.message}.`);
+        console.error("Failed to parse JSON response for style details:", e, "Raw response text:", jsonText);
+        throw new Error(`La respuesta de la API no es un JSON válido. Detalle: ${e.message}. Respuesta recibida: "${jsonText.substring(0, 100)}..."`);
     }
     
-    // Basic validation of parsed structure
     if (!parsed || !parsed.description || !Array.isArray(parsed.color_palette) || !Array.isArray(parsed.furniture_recommendations)) {
-        console.error("Parsed JSON for style details is missing expected properties. Parsed object:", parsed, "Full response:", JSON.stringify(response, null, 2));
-        throw new Error("La generación de detalles de estilo falló: El JSON de la API carece de las propiedades esperadas (descripción, paleta de colores, recomendaciones de muebles).");
+        console.error("Parsed JSON for style details is missing expected properties. Parsed object:", parsed);
+        throw new Error("La respuesta de la API no tiene la estructura esperada (faltan descripción, paleta de colores o muebles).");
     }
 
     return {
@@ -104,161 +106,172 @@ export const generateStyledImage = async (base64Data: string, mimeType: string, 
     const imagePart = fileToGenerativePart(base64Data, mimeType);
     const textPart = { text: prompt };
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: { parts: [imagePart, textPart] },
-        config: {
-            responseModalities: [Modality.IMAGE],
-        },
-    });
+    for (let i = 0; i < MAX_IMAGE_GENERATION_RETRIES; i++) {
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: { parts: [imagePart, textPart] },
+                config: {
+                    responseModalities: [Modality.IMAGE],
+                },
+            });
 
-    // --- Start of enhanced error handling ---
+            if (!response) {
+                throw new Error("La generación de imágenes falló: La respuesta de la API estaba vacía.");
+            }
 
-    // 1. Check if the overall response object is valid
-    if (!response) {
-        console.error("API returned an empty or undefined response for image generation.");
-        throw new Error("La generación de imágenes falló: La respuesta de la API estaba vacía o era inválida.");
-    }
+            if (response.promptFeedback?.blockReason) {
+                throw new Error(`La generación de imágenes fue bloqueada por: ${response.promptFeedback.blockReason}.`);
+            }
 
-    // Check for prompt blocking for text generation
-    if (response.promptFeedback?.blockReason) {
-        console.error("API blocked prompt for image generation:", response.promptFeedback.blockReason, response.promptFeedback.safetyRatings, "Full response:", JSON.stringify(response, null, 2));
-        throw new Error(`La generación de imágenes falló debido a que el mensaje fue bloqueado por: ${response.promptFeedback.blockReason}. Por favor, intenta un mensaje diferente.`);
-    }
+            const candidate = response.candidates?.[0];
+            if (!candidate) {
+                throw new Error("La generación de imágenes falló: No se encontró un candidato válido en la respuesta.");
+            }
+            
+            if (candidate.finishReason === 'NO_IMAGE') {
+                if (i < MAX_IMAGE_GENERATION_RETRIES - 1) {
+                    console.warn(`Reintento ${i + 1}/${MAX_IMAGE_GENERATION_RETRIES} para la generación de imagen (NO_IMAGE).`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    continue;
+                } else {
+                    throw new Error("La IA no pudo generar una imagen. Esto puede suceder si la solicitud es demasiado compleja o inapropiada.");
+                }
+            }
+            
+            for (const part of candidate.content?.parts || []) {
+                if (part.inlineData) {
+                    return {
+                        data: part.inlineData.data,
+                        mimeType: part.inlineData.mimeType,
+                    };
+                }
+            }
+            throw new Error("La respuesta de la API no contenía los datos de la imagen. Esto puede indicar un problema en la generación.");
 
-    // Defensive checks for the expected structure
-    const candidate = response.candidates?.[0];
-    if (!candidate) {
-        console.error("API response for image generation missing candidates or first candidate is null/undefined. Full response:", JSON.stringify(response, null, 2));
-        throw new Error("La generación de imágenes falló: No se encontró un candidato válido en la respuesta de la API.");
+        } catch (error: any) {
+            if (i < MAX_IMAGE_GENERATION_RETRIES - 1) {
+                console.warn(`Reintento ${i + 1}/${MAX_IMAGE_GENERATION_RETRIES} debido a error: ${error.message}`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                continue;
+            }
+            throw error;
+        }
     }
-    
-    // NEW: Check for NO_IMAGE finish reason
-    if (candidate.finishReason === 'NO_IMAGE') {
-        console.error("API response for image generation indicated 'NO_IMAGE' was generated. Candidate:", JSON.stringify(candidate, null, 2), "Full response:", JSON.stringify(response, null, 2));
-        throw new Error("La IA no pudo generar una imagen. Esto puede suceder si la solicitud es demasiado vaga, compleja o inapropiada. Por favor, intenta con un mensaje diferente.");
-    }
-
-    const content = candidate.content;
-    if (!content) {
-        console.error("API response for image generation missing 'content' property in first candidate. Candidate:", JSON.stringify(candidate, null, 2), "Full response:", JSON.stringify(response, null, 2));
-        throw new Error("La generación de imágenes falló: El candidato de la API no contenía la propiedad 'content' esperada."); 
-    }
-    const parts = content.parts;
-    if (!Array.isArray(parts) || parts.length === 0) {
-        console.error("API response for image generation missing or empty 'parts' array in content. Candidate:", JSON.stringify(candidate, null, 2), "Full response:", JSON.stringify(response, null, 2));
-        throw new Error("La generación de imágenes falló: El contenido del candidato no contenía un array 'parts' válido o estaba vacío."); 
-    }
-
-    // Now iterate through parts, confident that 'parts' is an array
-    for (const part of parts) {
-      if (part.inlineData) {
-        return {
-            data: part.inlineData.data,
-            mimeType: part.inlineData.mimeType,
-        };
-      }
-    }
-    // If loop completes without returning, it means no inlineData was found in any part
-    console.error("API response for image generation did not contain inlineData in any part, despite having content. Candidate:", JSON.stringify(candidate, null, 2), "Full response:", JSON.stringify(response, null, 2));
-    throw new Error("La generación de imágenes falló: La API no devolvió datos de imagen en línea. Esto puede indicar un problema en la generación de la imagen o una respuesta inesperada.");
-    // --- End of enhanced error handling ---
+    throw new Error("La generación de imágenes falló después de múltiples reintentos.");
 };
 
-export const generateInitialDesigns = async (base64Data: string, mimeType: string, analysis: string): Promise<StyleVariation[]> => {
-    // Updated to 5 distinct styles
-    const styles = ['Moderno', 'Nórdico', 'Clásico', 'Bohemio', 'Industrial']; 
+const generateFullVariation = async (base64Data: string, mimeType: string, styleName: string): Promise<StyleVariation> => {
+    const newImageData = await generateStyledImage(base64Data, mimeType, styleName);
+    const details = await generateStyleDetails(newImageData.data, newImageData.mimeType, styleName);
+
+    return {
+        ...details,
+        imageUrl: `data:${newImageData.mimeType};base64,${newImageData.data}`,
+        imageBase64: newImageData,
+        iterations: [],
+    };
+};
+
+export const generateInitialDesigns = async (
+    base64Data: string, 
+    mimeType: string, 
+    analysis: string,
+    onProgress: (style: string, current: number, total: number) => void
+): Promise<StyleVariation[]> => {
+    const styles = ['Moderno', 'Nórdico', 'Clásico', 'Bohemio', 'Industrial'];
     const results: StyleVariation[] = [];
 
-    // Phase 1: Generate all styled images in parallel
-    const imageGenerationPromises = styles.map(style =>
-        generateStyledImage(base64Data, mimeType, style)
-    );
-    const newImageDatas = await Promise.all(imageGenerationPromises);
-
-    // Phase 2: Generate all style details in parallel using the generated images
-    const detailsGenerationPromises = styles.map((style, index) =>
-        generateStyleDetails(newImageDatas[index].data, newImageDatas[index].mimeType, style)
-    );
-    const allDetails = await Promise.all(detailsGenerationPromises);
-
-    // Combine results
-    allDetails.forEach((details, index) => {
-        const newImageData = newImageDatas[index];
-        results.push({
-            ...details,
-            imageUrl: `data:${newImageData.mimeType};base64,${newImageData.data}`,
-            imageBase64: newImageData, // Corrected: Store the ImageBase64 object directly
-            iterations: [],
-        });
-    });
-
+    for (let i = 0; i < styles.length; i++) {
+        onProgress(styles[i], i + 1, styles.length);
+        const variation = await generateFullVariation(base64Data, mimeType, styles[i]);
+        results.push(variation);
+    }
+    
     return results;
 };
 
 
-export const refineDesign = async (base64Data: string, mimeType: string, prompt: string): Promise<ImageBase64> => {
+export const refineDesign = async (
+    base64Data: string, 
+    mimeType: string, 
+    prompt: string,
+    styleName: string
+): Promise<{ newImage: ImageBase64; newDetails: Pick<StyleVariation, 'description' | 'color_palette' | 'furniture_recommendations'> }> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const imagePart = fileToGenerativePart(base64Data, mimeType);
     const textPart = { text: prompt };
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: { parts: [imagePart, textPart] },
-        config: {
-            responseModalities: [Modality.IMAGE],
+    let refinedImage: ImageBase64 | null = null;
+
+    for (let i = 0; i < MAX_IMAGE_GENERATION_RETRIES; i++) {
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: { parts: [imagePart, textPart] },
+                config: {
+                    responseModalities: [Modality.IMAGE],
+                },
+            });
+
+            if (!response) {
+                throw new Error("El refinamiento de imagen falló: La respuesta de la API estaba vacía.");
+            }
+
+            if (response.promptFeedback?.blockReason) {
+                throw new Error(`El refinamiento de imagen fue bloqueado por: ${response.promptFeedback.blockReason}.`);
+            }
+
+            const candidate = response.candidates?.[0];
+            if (!candidate) {
+                throw new Error("El refinamiento de imagen falló: No se encontró un candidato válido en la respuesta.");
+            }
+
+            if (candidate.finishReason === 'NO_IMAGE') {
+                if (i < MAX_IMAGE_GENERATION_RETRIES - 1) {
+                    console.warn(`Reintento ${i + 1}/${MAX_IMAGE_GENERATION_RETRIES} para el refinamiento (NO_IMAGE).`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    continue;
+                } else {
+                    throw new Error("La IA no pudo generar una imagen para el refinamiento. Intenta con una instrucción diferente.");
+                }
+            }
+
+            for (const part of candidate.content?.parts || []) {
+                if (part.inlineData) {
+                    refinedImage = {
+                        data: part.inlineData.data,
+                        mimeType: part.inlineData.mimeType,
+                    };
+                    break;
+                }
+            }
+            
+            if (refinedImage) break;
+            
+            throw new Error("La respuesta de la API para el refinamiento no contenía datos de imagen.");
+        } catch (error: any) {
+             if (i < MAX_IMAGE_GENERATION_RETRIES - 1) {
+                console.warn(`Reintento ${i + 1}/${MAX_IMAGE_GENERATION_RETRIES} para refinamiento debido a error: ${error.message}`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                continue;
+            }
+            throw error;
+        }
+    }
+    
+    if (!refinedImage) {
+      throw new Error("El refinamiento de imagen falló después de múltiples reintentos.");
+    }
+    
+    const newDetailsResult = await generateStyleDetails(refinedImage.data, refinedImage.mimeType, styleName);
+
+    return {
+        newImage: refinedImage,
+        newDetails: {
+            description: newDetailsResult.description,
+            color_palette: newDetailsResult.color_palette,
+            furniture_recommendations: newDetailsResult.furniture_recommendations,
         },
-    });
-
-    // --- Start of enhanced error handling ---
-
-    // 1. Check if the overall response object is valid
-    if (!response) {
-        console.error("API returned an empty or undefined response for image refinement.");
-        throw new Error("El refinamiento de imágenes falló: La respuesta de la API estaba vacía o era inválida.");
-    }
-
-    // Check for prompt blocking for text generation
-    if (response.promptFeedback?.blockReason) {
-        console.error("API blocked prompt for image refinement:", response.promptFeedback.blockReason, response.promptFeedback.safetyRatings, "Full response:", JSON.stringify(response, null, 2));
-        throw new Error(`El refinamiento de imágenes falló debido a que el mensaje fue bloqueado por: ${response.promptFeedback.blockReason}. Por favor, intenta un mensaje diferente.`);
-    }
-
-    // Defensive checks for the expected structure
-    const candidate = response.candidates?.[0];
-    if (!candidate) {
-        console.error("API response for image refinement missing candidates or first candidate is null/undefined. Full response:", JSON.stringify(response, null, 2));
-        throw new Error("El refinamiento de imágenes falló: No se encontró un candidato válido en la respuesta de la API.");
-    }
-
-    // NEW: Check for NO_IMAGE finish reason
-    if (candidate.finishReason === 'NO_IMAGE') {
-        console.error("API response for image refinement indicated 'NO_IMAGE' was generated. Candidate:", JSON.stringify(candidate, null, 2), "Full response:", JSON.stringify(response, null, 2));
-        throw new Error("La IA no pudo generar una imagen para el refinamiento. Esto puede suceder si la solicitud es demasiado vaga, compleja o inapropiada. Por favor, intenta con un mensaje diferente.");
-    }
-
-    const content = candidate.content;
-    if (!content) {
-        console.error("API response for image refinement missing 'content' property in first candidate. Candidate:", JSON.stringify(candidate, null, 2), "Full response:", JSON.stringify(response, null, 2));
-        throw new Error("El refinamiento de imágenes falló: El candidato de la API no contenía la propiedad 'content' esperada.");
-    }
-    const parts = content.parts;
-    if (!Array.isArray(parts) || parts.length === 0) {
-        console.error("API response for image refinement missing or empty 'parts' array in content. Candidate:", JSON.stringify(candidate, null, 2), "Full response:", JSON.stringify(response, null, 2));
-        throw new Error("El refinamiento de imágenes falló: El contenido del candidato no contenía un array 'parts' válido o estaba vacío.");
-    }
-
-    // Now iterate through parts, confident that 'parts' is an array
-    for (const part of parts) {
-      if (part.inlineData) {
-        return {
-            data: part.inlineData.data,
-            mimeType: part.inlineData.mimeType,
-        };
-      }
-    }
-    // If loop completes without returning, it means no inlineData was found in any part
-    console.error("API response for image refinement did not contain inlineData in any part, despite having content. Candidate:", JSON.stringify(candidate, null, 2), "Full response:", JSON.stringify(response, null, 2));
-    throw new Error("El refinamiento de imágenes falló: La API no devolvió datos de imagen en línea en ninguna parte de la respuesta. Esto puede indicar un problema en la generación de la imagen o una respuesta inesperada.");
-    // --- End of enhanced error handling ---
+    };
 };
