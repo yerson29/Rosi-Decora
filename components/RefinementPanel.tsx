@@ -21,41 +21,27 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({ styleVariation, onRef
   };
   
   const allImages = [
-      { imageUrl: styleVariation.imageUrl, prompt: "Diseño inicial" },
+      { imageUrl: styleVariation.imageUrl, prompt: "Nuestro diseño inicial" },
       ...styleVariation.iterations
   ];
   
   return (
     <div className="flex flex-col h-full">
-      <h4 className="text-xl font-semibold mb-4 text-gray-700">Ajusta el Diseño</h4>
-      
-      <div className="relative flex-grow bg-gray-100 rounded-2xl p-2 shadow-inner mb-4 overflow-hidden aspect-video"> {/* Added aspect-video */}
-        {/* Replaced img with ImageWithFallback */}
-        <ImageWithFallback 
-            src={allImages[allImages.length - 1].imageUrl} 
-            alt="Último diseño" 
-            className="w-full h-full object-cover rounded-xl"
-            fallbackIconClassName="w-1/3 h-1/3" // Adjust as needed
-        />
-        <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-            Iteración #{styleVariation.iterations.length}
-        </div>
-      </div>
+      <h4 className="text-3xl main-title mb-4 text-primary-accent">Susúrrame tus Ideas...</h4>
       
       {styleVariation.iterations.length > 0 && (
           <div className="mb-4">
-              <h5 className="font-semibold text-gray-600 mb-2">Historial de Cambios:</h5>
+              <h5 className="font-semibold text-text-color-soft dark:text-gray-400 mb-2">Nuestra Evolución:</h5>
               <div className="flex items-center gap-2 overflow-x-auto pb-2" role="list" aria-label="Historial de iteraciones de diseño">
                    {allImages.slice(0, -1).map((iter, index) => (
-                       <div key={index} className="flex-shrink-0 text-center" role="listitem">
-                           {/* Replaced img with ImageWithFallback */}
+                       <div key={index} className="flex-shrink-0 text-center group relative" role="listitem">
                            <ImageWithFallback 
                                src={iter.imageUrl} 
                                alt={`Iteración ${index}: ${iter.prompt}`} 
-                               className="w-20 h-20 rounded-lg object-cover shadow-md mb-1"
-                               fallbackIconClassName="w-10 h-10" // Adjust as needed
+                               className="w-16 h-16 rounded-lg object-cover shadow-md"
+                               fallbackIconClassName="w-8 h-8"
                            />
-                           <span className="text-xs text-gray-500">#{index}</span>
+                           <span className="absolute bottom-1 right-1 text-xs bg-black/50 text-white px-1.5 py-0.5 rounded-full">#{index}</span>
                        </div>
                    ))}
               </div>
@@ -66,30 +52,30 @@ const RefinementPanel: React.FC<RefinementPanelProps> = ({ styleVariation, onRef
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Ej: 'Añade una planta grande en la esquina', 'Cambia el sofá a un color azul'..."
-          className="w-full p-3 border border-gray-300 rounded-2xl mb-3 focus:ring-2 focus:ring-pink-400 focus:border-transparent transition"
+          placeholder="Dime qué soñaste, mi amor. Ej: 'Un sofá donde acurrucarnos' o 'Paredes con el color de tus ojos'..."
+          className="w-full p-3 border border-secondary-accent/50 rounded-2xl mb-3 focus:ring-2 focus:ring-primary-accent focus:border-transparent transition bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:placeholder-gray-500"
           rows={3}
           aria-label="Introduce tu solicitud de refinamiento de diseño"
         ></textarea>
-        <p className="text-sm text-gray-500 mb-4 text-center">
-            Un consejo, mi amor: Sé específica y concisa. Ej: "Añade una alfombra redonda gris", "Cambia el color de la pared a azul pastel", "Quita el cuadro grande".
+        <p className="text-sm text-text-color-soft dark:text-gray-400 mb-4 text-center">
+            Cuéntame con detalle qué imaginas, y haré que se vuelva realidad para nosotros.
         </p>
         <div className="flex items-center gap-4">
             <button
               type="submit"
               disabled={!prompt.trim()}
-              className="flex-grow py-3 rounded-xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white font-semibold shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+              className="flex-grow py-3 rounded-xl btn-primary text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Generar una nueva versión del diseño"
             >
-              Crear Nueva Versión
+              Transformar
             </button>
             <button
                 type="button"
                 onClick={onRevert}
                 disabled={styleVariation.iterations.length === 0}
-                className="flex-shrink-0 p-3 rounded-xl bg-gray-200 text-gray-700 font-semibold shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+                className="flex-shrink-0 p-3 rounded-xl bg-gray-200 text-gray-700 font-semibold shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 dark:bg-gray-600 dark:text-gray-200"
                 aria-label="Volver a la versión anterior"
-                title="Volver a la versión anterior"
+                title="Volver a nuestro último sueño"
             >
                 <RevertIcon className="w-6 h-6"/>
             </button>
