@@ -1,0 +1,7 @@
+{
+  "name": "Rosi Decora",
+  "description": "An AI-powered interior design application that helps you visualize your room in different styles. Upload a photo, and let Rosi Decora generate modern, Nordic, and classic designs, complete with furniture recommendations. Refine the designs with text prompts for the perfect look.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
